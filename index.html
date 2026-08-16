@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <title>Vehicle Live Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f9; }
+        h2 { color: #333; }
+        .dashboard-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        .status-active { color: green; font-weight: bold; }
+        .status-idle { color: orange; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="dashboard-card">
+        <h2>🚚 Live Vehicle Dashboard</h2>
+        <p>Last Sync: <span id="sync-time">Fetching...</span></p>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Vehicle No</th>
+                    <th>Driver</th>
+                    <th>Status</th>
+                    <th>Location</th>
+                    <th>Speed (km/h)</th>
+                    <th>Last Update</th>
+                </tr>
+            </thead>
+            <tbody id="vehicle-data">
+                <tr><td colspan="6">Loading data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // Apni published CSV URL yahan daalein
+        const SHEET_CSV_URL = "YOUR_PUBLISHED_CSV_URL_HERE";
+
+        async function fetchVehicleData() {
+            try {
+                // Cache bypass karne ke liye timestamp lagayein
+                const response = await fetch(SHEET_CSV_URL + "?t=" + new Date().getTime());
+                const csvText = await response.text();
+                
+                const rows = csvText.split('\n').map(row => row.split(','));
+                const tableBody = document.getElementById('vehicle-data');
+                tableBody.innerHTML = '';
+
+                // Header chhod kar baaki rows render karein
+                for (let i = 1; i < rows.length; i++) {
+                    if (rows[i].length < 2) continue; // empty row check
+                    
+                    const [vNo, driver, status, location, speed, lastUpdate] = rows[i];
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${vNo || ''}</strong></td>
+                        <td>${driver || ''}</td>
+                        <td><span class="${status?.trim() === 'Active' ? 'status-active' : 'status-idle'}">${status || ''}</span></td>
+                        <td>${location || ''}</td>
+                        <td>${speed || '0'}</td>
+                        <td>${lastUpdate || ''}</td>
+                    `;
+                    tableBody.appendChild(tr);
+                }
+
+                document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
+            } catch (error) {
+                console.error("Data fetch error:", error);
+            }
+        }
+
+        // Pehli baar call karein
+        fetchVehicleData();
+
+        // Har 5 second me auto-update karein
+        setInterval(fetchVehicleData, 5000);
+    </script>
+</body>
+</html>
