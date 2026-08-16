@@ -2,69 +2,92 @@
 <html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <title>Vehicle Live Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Vehicle Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f6f9; }
-        h2 { color: #333; }
-        .dashboard-card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-        th { background-color: #007bff; color: white; }
-        .status-active { color: green; font-weight: bold; }
-        .status-idle { color: orange; font-weight: bold; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background-color: #f4f6f9; }
+        .dashboard-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+        h2 { margin-top: 0; color: #1a252f; }
+        .sync-info { font-size: 14px; color: #6c757d; margin-bottom: 15px; }
+        .table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th { background-color: #007bff; color: white; padding: 12px; text-align: left; }
+        td { border-bottom: 1px solid #e9ecef; padding: 10px; color: #333; }
+        tr:hover { background-color: #f8f9fa; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
+        .badge-success { background-color: #d4edda; color: #155724; }
+        .badge-warning { background-color: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
 
     <div class="dashboard-card">
         <h2>🚚 Live Vehicle Dashboard</h2>
-        <p>Last Sync: <span id="sync-time">Fetching...</span></p>
+        <div class="sync-info">Last Sync: <strong id="sync-time">Fetching...</strong></div>
         
-        <table>
-            <thead>
-                <tr>
-                    <th>Vehicle No</th>
-                    <th>Driver</th>
-                    <th>Status</th>
-                    <th>Location</th>
-                    <th>Speed (km/h)</th>
-                    <th>Last Update</th>
-                </tr>
-            </thead>
-            <tbody id="vehicle-data">
-                <tr><td colspan="6">Loading data...</td></tr>
-            </tbody>
-        </table>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Vehicle No</th>
+                        <th>Permit Holder</th>
+                        <th>Contact No</th>
+                        <th>State</th>
+                        <th>Remarks / Status</th>
+                        <th>Current Validity</th>
+                    </tr>
+                </thead>
+                <tbody id="vehicle-data">
+                    <tr><td colspan="7">Loading live sheet data...</td></tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        // Apni published CSV URL yahan daalein
-        const SHEET_CSV_URL = "YOUR_PUBLISHED_CSV_URL_HERE";
+        // Step 1 से प्राप्त अपनी Google Sheet की CSV URL को यहाँ पेस्ट करें:
+        const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSucNttQg7Lghr41JIAN7Ss-8zJTi6cQFi9KRn8mu3RSBRql9w9AdgkxiGMFR6J8gm2YQ8fxsJEIEM3/pub?gid=0&single=true&output=csv";
 
         async function fetchVehicleData() {
             try {
-                // Cache bypass karne ke liye timestamp lagayein
-                const response = await fetch(SHEET_CSV_URL + "?t=" + new Date().getTime());
+                // Cache bypass करने के लिए timestamp जोड़ा गया है
+                const response = await fetch(SHEET_CSV_URL + (SHEET_CSV_URL.includes('?') ? '&' : '?') + "t=" + new Date().getTime());
                 const csvText = await response.text();
                 
-                const rows = csvText.split('\n').map(row => row.split(','));
+                // CSV Parsing Logic
+                const rows = csvText.split('\n').map(row => {
+                    return row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(cell => cell.replace(/^"|"$/g, '').trim());
+                });
+
                 const tableBody = document.getElementById('vehicle-data');
                 tableBody.innerHTML = '';
 
-                // Header chhod kar baaki rows render karein
+                // Headers (Row 0) छोड़कर Row 1 से Render करें
                 for (let i = 1; i < rows.length; i++) {
-                    if (rows[i].length < 2) continue; // empty row check
-                    
-                    const [vNo, driver, status, location, speed, lastUpdate] = rows[i];
-                    
+                    const row = rows[i];
+                    if (row.length < 5) continue; // Empty row filter
+
+                    // Master Sheet Column Index Mapping
+                    const dateVal = row[0] || '-';          // Col A: DATE
+                    const remarks = row[2] || '-';          // Col C: Remarks
+                    const state = row[9] || '-';            // Col J: STATE
+                    const validity = row[10] || '-';        // Col K: Current Validity
+                    const vehicleNo = row[17] || '-';       // Col R: Vehicle no.
+                    const ownerName = row[20] || '-';       // Col U: permit holder name
+                    const contactNo = row[21] || '-';       // Col V: contact no.
+
+                    const statusClass = remarks.toLowerCase().includes('issued') ? 'badge-success' : 'badge-warning';
+
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td><strong>${vNo || ''}</strong></td>
-                        <td>${driver || ''}</td>
-                        <td><span class="${status?.trim() === 'Active' ? 'status-active' : 'status-idle'}">${status || ''}</span></td>
-                        <td>${location || ''}</td>
-                        <td>${speed || '0'}</td>
-                        <td>${lastUpdate || ''}</td>
+                        <td>${dateVal}</td>
+                        <td><strong>${vehicleNo}</strong></td>
+                        <td>${ownerName}</td>
+                        <td>${contactNo}</td>
+                        <td>${state}</td>
+                        <td><span class="badge ${statusClass}">${remarks}</span></td>
+                        <td>${validity}</td>
                     `;
                     tableBody.appendChild(tr);
                 }
@@ -72,14 +95,15 @@
                 document.getElementById('sync-time').innerText = new Date().toLocaleTimeString();
             } catch (error) {
                 console.error("Data fetch error:", error);
+                document.getElementById('vehicle-data').innerHTML = `<tr><td colspan="7" style="color:red;">Failed to load data. Please check CSV URL.</td></tr>`;
             }
         }
 
-        // Pehli baar call karein
+        // initial call
         fetchVehicleData();
 
-        // Har 5 second me auto-update karein
-        setInterval(fetchVehicleData, 5000);
+        // Har 10 seconds mein auto update
+        setInterval(fetchVehicleData, 10000);
     </script>
 </body>
 </html>
